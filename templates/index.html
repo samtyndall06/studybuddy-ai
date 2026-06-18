@@ -1,10 +1,48 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>StudyBuddy AI</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <h1>StudyBuddy AI</h1>
-    <p>If you see this, Flask is working!</p>
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <div class="sidebar-logo">📚 StudyBuddy</div>
+        <nav class="sidebar-nav">
+            <button class="nav-btn active" data-mode="chat">💬 Chat</button>
+            <button class="nav-btn" data-mode="quiz">🧠 Quiz</button>
+            <button class="nav-btn" data-mode="flashcards">📇 Flashcards</button>
+            <button class="nav-btn" data-mode="notes">📝 Notes</button>
+        </nav>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main">
+
+        <!-- CHAT MODE -->
+        <div class="view active" id="chat-view">
+            <div class="chat-header">
+                <h1>Chat with StudyBuddy</h1>
+                <p>Ask me to explain any concept, any subject</p>
+            </div>
+            <div class="chat-messages" id="chat-messages">
+                <div class="message ai-message">
+                    <div class="message-bubble">
+                        Hey! I'm StudyBuddy. Ask me to explain something, and I'll break it down for you. What are you studying today?
+                    </div>
+                </div>
+            </div>
+            <div class="chat-input-area">
+                <input type="text" id="chat-input" placeholder="Ask me anything..." />
+                <button id="send-btn">Send</button>
+            </div>
+        </div>
+
+    </main>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
