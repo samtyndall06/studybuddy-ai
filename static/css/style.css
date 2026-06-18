@@ -260,3 +260,57 @@ body {
 .quiz-results h2 { font-size: 26px; margin-bottom: 1rem; }
 .quiz-score { font-size: 18px; color: #8e8e93; margin-bottom: 1.5rem; }
 .quiz-results button { max-width: 240px; }
+
+.sidebar-divider {
+    height: 1px;
+    background: #25252f;
+    margin: 1.5rem 0 1rem;
+}
+.sidebar-section { padding: 0 0.5rem; }
+.sidebar-label {
+    font-size: 11px;
+    color: #6e6e73;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 8px;
+}
+.upload-btn {
+    display: block;
+    background: #1e1e28;
+    border: 1px dashed #2e2e3a;
+    border-radius: 10px;
+    padding: 10px;
+    text-align: center;
+    font-size: 13px;
+    color: #8e8e93;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 0.75rem;
+}
+.upload-btn:hover { border-color: #2a4d8f; color: #e8e8ed; }
+.document-list { display: flex; flex-direction: column; gap: 6px; }
+.document-item {
+    background: #1e1e28;
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.document-item:hover { background: #25252f; }
+.document-item.selected { background: #2a4d8f; }
+.document-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 130px;
+}
+.document-remove {
+    color: #d93025;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 2px;
+}

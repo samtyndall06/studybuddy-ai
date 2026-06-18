@@ -50,7 +50,7 @@ async function sendMessage() {
         const response = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message })
+            body: JSON.stringify({ message, document: selectedDocument })
         });
         const data = await response.json();
         removeTyping();
@@ -110,7 +110,7 @@ startQuizBtn.addEventListener('click', async () => {
         const response = await fetch('/api/quiz/generate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ topic, count: parseInt(count) })
+            body: JSON.stringify({ topic, count: parseInt(count), document: selectedDocument })
         });
         const data = await response.json();
 
@@ -208,3 +208,64 @@ newQuizBtn.addEventListener('click', () => {
     quizSetup.style.display = 'flex';
     document.getElementById('quiz-topic').value = '';
 });
+
+// ---- FILE UPLOAD ----
+let selectedDocument = null;
+const fileUpload = document.getElementById('file-upload');
+const documentList = document.getElementById('document-list');
+
+fileUpload.addEventListener('change', async () => {
+    const file = fileUpload.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const response = await fetch('/api/upload', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await response.json();
+
+        if (response.ok) {
+            addMessage(`📎 Uploaded "${data.filename}" — you can now select it to ask questions or generate quizzes from it.`, 'ai');
+            loadDocuments();
+        } else {
+            alert(data.error || 'Upload failed');
+        }
+    } catch (error) {
+        alert('Error uploading file');
+    }
+
+    fileUpload.value = '';
+});
+
+async function loadDocuments() {
+    const response = await fetch('/api/documents');
+    const data = await response.json();
+
+    documentList.innerHTML = '';
+    data.documents.forEach(filename => {
+        const item = document.createElement('div');
+        item.className = `document-item ${selectedDocument === filename ? 'selected' : ''}`;
+        item.innerHTML = `
+            <span class="document-name">📄 ${filename}</span>
+            <span class="document-remove" data-filename="${filename}">✕</span>
+        `;
+        item.addEventListener('click', (e) => {
+            if (e.target.classList.contains('document-remove')) return;
+            selectedDocument = selectedDocument === filename ? null : filename;
+            loadDocuments();
+        });
+        item.querySelector('.document-remove').addEventListener('click', async (e) => {
+            e.stopPropagation();
+            await fetch(`/api/documents/${filename}`, { method: 'DELETE' });
+            if (selectedDocument === filename) selectedDocument = null;
+            loadDocuments();
+        });
+        documentList.appendChild(item);
+    });
+}
+
+loadDocuments();

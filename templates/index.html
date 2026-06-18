@@ -16,6 +16,15 @@
             <button class="nav-btn" data-mode="quiz">🧠 Quiz</button>
             <button class="nav-btn" data-mode="flashcards">📇 Flashcards</button>
             <button class="nav-btn" data-mode="notes">📝 Notes</button>
+            <div class="sidebar-divider"></div>
+            <div class="sidebar-section">
+                <p class="sidebar-label">Study Materials</p>
+                <label class="upload-btn">
+                    📎 Upload File
+                    <input type="file" id="file-upload" accept=".pdf,.txt" hidden />
+                </label>
+                <div id="document-list" class="document-list"></div>
+            </div>
         </nav>
     </aside>
 
