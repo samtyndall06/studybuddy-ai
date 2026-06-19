@@ -8,7 +8,6 @@
 </head>
 <body>
 
-    <!-- SIDEBAR -->
     <aside class="sidebar">
         <div class="sidebar-logo">📚 StudyBuddy</div>
         <nav class="sidebar-nav">
@@ -16,21 +15,24 @@
             <button class="nav-btn" data-mode="quiz">🧠 Quiz</button>
             <button class="nav-btn" data-mode="flashcards">📇 Flashcards</button>
             <button class="nav-btn" data-mode="notes">📝 Notes</button>
-            <div class="sidebar-divider"></div>
-            <div class="sidebar-section">
-                <p class="sidebar-label">Study Materials</p>
-                <label class="upload-btn">
-                    📎 Upload File
-                    <input type="file" id="file-upload" accept=".pdf,.txt" hidden />
-                </label>
-                <div id="document-list" class="document-list"></div>
-            </div>
         </nav>
+        <div class="sidebar-divider"></div>
+        <div class="sidebar-section">
+            <p class="sidebar-label">Study Materials</p>
+            <label class="upload-btn">
+                📎 Upload File
+                <input type="file" id="file-upload" accept=".pdf,.txt" hidden />
+            </label>
+            <div id="document-list" class="document-list"></div>
+        </div>
     </aside>
 
-    <!-- MAIN CONTENT -->
     <main class="main">
-
+        <div id="theme-toggle" class="theme-switch" role="button" aria-label="Toggle Theme">
+            <span class="switch-icon sun">☀️</span>
+            <span class="switch-icon moon">🌙</span>
+            <div class="switch-thumb"></div>
+        </div>
         <!-- CHAT MODE -->
         <div class="view active" id="chat-view">
             <div class="chat-header">
@@ -38,15 +40,16 @@
                 <p>Ask me to explain any concept, any subject</p>
             </div>
             <div class="chat-messages" id="chat-messages">
-                <div class="message ai-message">
-                    <div class="message-bubble">
-                        Hey! I'm StudyBuddy. Ask me to explain something, and I'll break it down for you. What are you studying today?
+                <div class="chat-greeting" id="chat-greeting">
+                    <div class="greeting-text">
+                        <span id="greeting-line1">Hello!</span>
+                        <span id="greeting-line2">How can I help you today?</span>
                     </div>
                 </div>
             </div>
             <div class="chat-input-area">
-                <input type="text" id="chat-input" placeholder="Ask me anything..." />
-                <button id="send-btn">Send</button>
+                <input type="text" id="chat-input" placeholder="Type a message..." />
+                <button id="send-btn">➤</button>
             </div>
         </div>
 
@@ -56,8 +59,6 @@
                 <h1>Quiz Mode</h1>
                 <p>Test your knowledge on any topic</p>
             </div>
-        
-            <!-- Topic selection screen -->
             <div class="quiz-setup" id="quiz-setup">
                 <div class="quiz-setup-card">
                     <label>What topic do you want to be quizzed on?</label>
@@ -72,8 +73,6 @@
                     <button id="start-quiz-btn">Start Quiz</button>
                 </div>
             </div>
-        
-            <!-- Active quiz screen -->
             <div class="quiz-active" id="quiz-active" style="display:none;">
                 <div class="quiz-progress">
                     <span id="quiz-progress-text">Question 1 of 5</span>
@@ -88,14 +87,75 @@
                 </div>
                 <div class="quiz-feedback" id="quiz-feedback" style="display:none;"></div>
             </div>
-        
-            <!-- Results screen -->
             <div class="quiz-results" id="quiz-results" style="display:none;">
                 <h2>Quiz Complete!</h2>
                 <p class="quiz-score" id="quiz-score"></p>
                 <button id="new-quiz-btn">Start New Quiz</button>
             </div>
         </div>
+
+        <!-- FLASHCARDS MODE -->
+        <div class="view" id="flashcards-view">
+            <div class="chat-header">
+                <h1>Flashcards</h1>
+                <p>Create and review key concepts</p>
+            </div>
+            <div class="flashcards-content">
+                <div class="flashcard-create card">
+                    <h2>Create Flashcard</h2>
+                    <div class="fc-tabs">
+                        <button class="fc-tab active" data-tab="manual">Manual</button>
+                        <button class="fc-tab" data-tab="ai">AI Generate</button>
+                    </div>
+                    <div id="manual-tab">
+                        <input type="text" id="fc-front" placeholder="Front (question or term)" />
+                        <textarea id="fc-back" placeholder="Back (answer or definition)"></textarea>
+                        <input type="text" id="fc-topic" placeholder="Topic (optional)" />
+                        <button id="save-flashcard-btn">Save Flashcard</button>
+                    </div>
+                    <div id="ai-tab" style="display:none;">
+                        <input type="text" id="fc-ai-topic" placeholder="Topic to generate flashcards about" />
+                        <label style="font-size:13px; color:#8e8e93; margin-bottom:4px; display:block;">Number of flashcards</label>
+                        <select id="fc-ai-count">
+                            <option value="1">1 flashcard</option>
+                            <option value="3">3 flashcards</option>
+                            <option value="5" selected>5 flashcards</option>
+                            <option value="10">10 flashcards</option>
+                        </select>
+                        <button id="generate-flashcard-btn">Generate with AI</button>
+                        <div id="fc-preview" style="display:none;" class="fc-preview">
+                            <div id="fc-preview-list"></div>
+                            <button id="save-generated-btn">Save All Flashcards</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="flashcard-deck card">
+                    <h2>My Flashcards <span id="fc-count"></span></h2>
+                    <div id="flashcard-list"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- NOTES MODE -->
+        <div class="view" id="notes-view">
+            <div class="chat-header">
+                <h1>Notes</h1>
+                <p>Save important explanations and summaries</p>
+            </div>
+            <div class="notes-content">
+                <div class="note-create card">
+                    <h2>New Note</h2>
+                    <input type="text" id="note-title" placeholder="Title" />
+                    <textarea id="note-content" placeholder="Write your notes here..." rows="6"></textarea>
+                    <button id="save-note-btn">Save Note</button>
+                </div>
+                <div class="notes-list card">
+                    <h2>Saved Notes</h2>
+                    <div id="notes-container"></div>
+                </div>
+            </div>
+        </div>
+
     </main>
 
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
