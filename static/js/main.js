@@ -1,35 +1,4 @@
-const chatMessages = document.getElementById('chat-messages');
-const chatInput = document.getElementById('chat-input');
-const sendBtn = document.getElementById('send-btn');
-
-// ---- GREETING ----
-async function loadGreeting() {
-    // Check if we have a stored name
-    let name = localStorage.getItem('studybuddy_name');
-
-    if (!name) {
-        // Ask for name on first visit
-        name = prompt('Welcome to StudyBuddy! What\'s your name?') || 'there';
-        localStorage.setItem('studybuddy_name', name);
-    }
-
-    try {
-        const response = await fetch('/api/greeting', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name })
-        });
-        const data = await response.json();
-        document.getElementById('greeting-line1').textContent = data.line1;
-        document.getElementById('greeting-line2').textContent = data.line2;
-    } catch (error) {
-        document.getElementById('greeting-line1').textContent = `Hello, ${name}!`;
-        document.getElementById('greeting-line2').textContent = 'How can I help you today?';
-    }
-}
-
-loadGreeting();
-// Set current time on the initial message
+// Set current time on load
 document.addEventListener('DOMContentLoaded', () => {
     const timeEl = document.getElementById('chat-time');
     if (timeEl) {
@@ -40,13 +9,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+const chatMessages = document.getElementById('chat-messages');
+const chatInput = document.getElementById('chat-input');
+const sendBtn = document.getElementById('send-btn');
+
 function getCurrentTime() {
     const now = new Date();
     return now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
 }
 
 function addMessage(text, sender) {
-    // Hide greeting when first message appears
     const greeting = document.getElementById('chat-greeting');
     if (greeting) greeting.style.display = 'none';
 
@@ -108,7 +80,7 @@ async function sendMessage() {
         const response = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message, document: selectedDocument })
+            body: JSON.stringify({ message, documents: selectedDocuments })
         });
         const data = await response.json();
         removeTyping();
@@ -137,31 +109,59 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
     });
 });
 
+// ---- GREETING ----
+async function loadGreeting() {
+    let name = localStorage.getItem('studybuddy_name');
+    if (!name) {
+        name = prompt('Welcome to StudyBuddy! What\'s your name?') || 'there';
+        localStorage.setItem('studybuddy_name', name);
+    }
+    try {
+        const response = await fetch('/api/greeting', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name })
+        });
+        const data = await response.json();
+        document.getElementById('greeting-line1').textContent = data.line1;
+        document.getElementById('greeting-line2').textContent = data.line2;
+    } catch (error) {
+        document.getElementById('greeting-line1').textContent = `Hello, ${name}!`;
+        document.getElementById('greeting-line2').textContent = 'How can I help you today?';
+    }
+}
+
+loadGreeting();
+
 // ---- FILE UPLOAD ----
-let selectedDocument = null;
+let selectedDocuments = [];
 const fileUpload = document.getElementById('file-upload');
 const documentList = document.getElementById('document-list');
 
 fileUpload.addEventListener('change', async () => {
-    const file = fileUpload.files[0];
-    if (!file) return;
-    const formData = new FormData();
-    formData.append('file', file);
-    try {
-        const response = await fetch('/api/upload', {
-            method: 'POST',
-            body: formData
-        });
-        const data = await response.json();
-        if (response.ok) {
-            addMessage(`📎 Uploaded "${data.filename}" — select it in the sidebar to ask questions about it.`, 'ai');
-            loadDocuments();
-        } else {
-            alert(data.error || 'Upload failed');
+    const files = Array.from(fileUpload.files);
+    if (!files.length) return;
+
+    for (const file of files) {
+        const formData = new FormData();
+        formData.append('file', file);
+        try {
+            const response = await fetch('/api/upload', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+            if (response.ok) {
+                addMessage(`📎 Uploaded "${data.filename}"`, 'ai');
+            } else {
+                alert(`Failed to upload ${file.name}: ${data.error}`);
+            }
+        } catch (error) {
+            alert(`Error uploading ${file.name}`);
         }
-    } catch (error) {
-        alert('Error uploading file');
     }
+
+    loadDocuments();
     fileUpload.value = '';
 });
 
@@ -169,25 +169,43 @@ async function loadDocuments() {
     const response = await fetch('/api/documents');
     const data = await response.json();
     documentList.innerHTML = '';
+
+    if (data.documents.length === 0) {
+        documentList.innerHTML = '<p style="color:#6e6e73; font-size:12px; padding: 4px;">No files uploaded</p>';
+        return;
+    }
+
     data.documents.forEach(filename => {
+        const isSelected = selectedDocuments.includes(filename);
         const item = document.createElement('div');
-        item.className = `document-item ${selectedDocument === filename ? 'selected' : ''}`;
+        item.className = `document-item ${isSelected ? 'selected' : ''}`;
         item.innerHTML = `
             <span class="document-name">📄 ${filename}</span>
             <span class="document-remove" data-filename="${filename}">✕</span>
         `;
         item.addEventListener('click', (e) => {
             if (e.target.classList.contains('document-remove')) return;
-            selectedDocument = selectedDocument === filename ? null : filename;
+            if (isSelected) {
+                selectedDocuments = selectedDocuments.filter(d => d !== filename);
+            } else {
+                selectedDocuments.push(filename);
+            }
             loadDocuments();
         });
         item.querySelector('.document-remove').addEventListener('click', async () => {
             await fetch(`/api/documents/${filename}`, { method: 'DELETE' });
-            if (selectedDocument === filename) selectedDocument = null;
+            selectedDocuments = selectedDocuments.filter(d => d !== filename);
             loadDocuments();
         });
         documentList.appendChild(item);
     });
+
+    if (selectedDocuments.length > 0) {
+        const info = document.createElement('p');
+        info.style.cssText = 'font-size:11px; color:#2a6dd9; padding: 6px 4px 0;';
+        info.textContent = `${selectedDocuments.length} file${selectedDocuments.length > 1 ? 's' : ''} selected`;
+        documentList.appendChild(info);
+    }
 }
 
 loadDocuments();
@@ -214,7 +232,7 @@ startQuizBtn.addEventListener('click', async () => {
         const response = await fetch('/api/quiz/generate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ topic, count: parseInt(count), document: selectedDocument })
+            body: JSON.stringify({ topic, count: parseInt(count), documents: selectedDocuments })
         });
         const data = await response.json();
         if (data.questions && data.questions.length > 0) {
@@ -368,25 +386,20 @@ document.getElementById('generate-flashcard-btn').addEventListener('click', asyn
     const topic = document.getElementById('fc-ai-topic').value.trim();
     const count = document.getElementById('fc-ai-count').value;
     if (!topic) { alert('Please enter a topic'); return; }
-
     const btn = document.getElementById('generate-flashcard-btn');
     btn.disabled = true;
     btn.textContent = 'Generating...';
-
     const response = await fetch('/api/flashcards/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic, count: parseInt(count), document: selectedDocument })
+        body: JSON.stringify({ topic, count: parseInt(count), documents: selectedDocuments })
     });
     const data = await response.json();
-
     if (data.flashcards && data.flashcards.length > 0) {
         generatedFlashcard = data.flashcards;
-
-        // Show preview of all generated flashcards
         const previewList = document.getElementById('fc-preview-list');
         previewList.innerHTML = '';
-        data.flashcards.forEach((fc, i) => {
+        data.flashcards.forEach((fc) => {
             const item = document.createElement('div');
             item.style.cssText = 'margin-bottom: 10px; padding: 10px; background: #0f0f14; border-radius: 8px;';
             item.innerHTML = `
@@ -395,24 +408,19 @@ document.getElementById('generate-flashcard-btn').addEventListener('click', asyn
             `;
             previewList.appendChild(item);
         });
-
         document.getElementById('fc-preview').style.display = 'block';
         document.getElementById('save-generated-btn').textContent =
             `Save All ${data.flashcards.length} Flashcards`;
     } else {
         alert('Failed to generate flashcards. Try again.');
     }
-
     btn.disabled = false;
     btn.textContent = 'Generate with AI';
 });
 
 document.getElementById('save-generated-btn').addEventListener('click', async () => {
     if (!generatedFlashcard || generatedFlashcard.length === 0) return;
-
     const topic = document.getElementById('fc-ai-topic').value.trim();
-
-    // Save all generated flashcards
     for (const fc of generatedFlashcard) {
         await fetch('/api/flashcards', {
             method: 'POST',
@@ -420,7 +428,6 @@ document.getElementById('save-generated-btn').addEventListener('click', async ()
             body: JSON.stringify({ front: fc.front, back: fc.back, topic })
         });
     }
-
     document.getElementById('fc-preview').style.display = 'none';
     document.getElementById('fc-ai-topic').value = '';
     generatedFlashcard = null;
@@ -473,26 +480,3 @@ document.getElementById('save-note-btn').addEventListener('click', async () => {
 });
 
 loadNotes();
-
-document.addEventListener('DOMContentLoaded', () => {
-    const themeToggle = document.getElementById('theme-toggle');
-    const body = document.body;
-
-    // 1. Check for saved theme in localStorage
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme === 'light') {
-        body.classList.add('light-mode');
-    }
-
-    // 2. Toggle theme on click
-    themeToggle.addEventListener('click', () => {
-        body.classList.toggle('light-mode');
-        
-        // Save the user's preference
-        if (body.classList.contains('light-mode')) {
-            localStorage.setItem('theme', 'light');
-        } else {
-            localStorage.setItem('theme', 'dark');
-        }
-    });
-});

@@ -5,16 +5,38 @@ import sqlite3
 import os
 import pdfplumber
 from werkzeug.utils import secure_filename
+import re  # <-- ADD THIS for cleaning DeepSeek's thinking output
 
 app = Flask(__name__)
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
+# CHANGE THIS to your DeepSeek model
+DEEPSEEK_MODEL = "deepseek-r1:7b"  # <-- CHANGE THIS
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'pdf', 'txt'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# Store extracted text from uploaded documents in memory
 document_store = {}
+
+# ADD THIS HELPER FUNCTION to clean DeepSeek's thinking process
+def clean_deepseek_response(text):
+    """Remove DeepSeek's reasoning (between  and  tags)"""
+    # Remove content between  and  tags
+    cleaned = re.sub(r'<.*?>', '', text, flags=re.DOTALL)
+    # Remove any leftover thinking artifacts
+    cleaned = re.sub(r'Thinking:', '', cleaned, flags=re.IGNORECASE)
+    return cleaned.strip()
+
+def get_context(selected_docs):
+    if not selected_docs:
+        return ""
+    context_parts = []
+    for doc in selected_docs:
+        if doc in document_store:
+            context_parts.append(f"--- {doc} ---\n{document_store[doc]}")
+    if not context_parts:
+        return ""
+    return "Use these documents to help answer:\n\n" + "\n\n".join(context_parts) + "\n\n"
 
 DATABASE = 'studybuddy.db'
 
@@ -59,26 +81,74 @@ def home():
     return render_template('index.html')
 
 
+@app.route('/api/greeting', methods=['POST'])
+def get_greeting():
+    data = request.get_json()
+    name = data.get('name', 'there')
+
+    prompt = f"""Generate a short friendly greeting for a student named {name} who is about to study.
+
+Respond with ONLY this JSON format:
+{{"line1": "Hello, {name}!", "line2": "short motivational subtitle here"}}
+
+The line2 should be encouraging and study-related, max 6 words.
+
+IMPORTANT: Do not include any reasoning or explanation. Only output the JSON."""
+
+    response = requests.post(OLLAMA_URL, json={
+        "model": DEEPSEEK_MODEL,  # <-- CHANGED
+        "prompt": prompt,
+        "stream": False,
+        "format": "json"
+    })
+
+    if response.status_code == 200:
+        text = response.json().get('response', '').strip()
+        try:
+            result = json.loads(text)
+            if 'line1' in result and 'line2' in result:
+                return jsonify(result)
+        except json.JSONDecodeError:
+            pass
+
+    return jsonify({
+        "line1": f"Hello, {name}!",
+        "line2": "How can I help you today?"
+    })
+
+
 @app.route('/api/chat', methods=['POST'])
 def chat():
     data = request.get_json()
     user_message = data.get('message', '')
-    selected_doc = data.get('document', None)
+    selected_docs = data.get('documents', [])
 
-    context = ""
-    if selected_doc and selected_doc in document_store:
-        context = f"Use this document content to help answer the question:\n\n{document_store[selected_doc]}\n\n"
+    context = get_context(selected_docs)
+    
+    # ADD THIS: Better prompting for DeepSeek
+    if context:
+        full_prompt = f"""{context}
 
-    full_prompt = context + "Question: " + user_message if context else user_message
+Question: {user_message}
+
+Please provide a clear, helpful answer based on the documents above. 
+IMPORTANT: Do not include your reasoning process in the response. Just give the final answer."""
+    else:
+        full_prompt = f"""Question: {user_message}
+
+Please provide a clear, helpful answer.
+IMPORTANT: Do not include your reasoning process in the response. Just give the final answer."""
 
     response = requests.post(OLLAMA_URL, json={
-        "model": "llama3.2",
+        "model": DEEPSEEK_MODEL,  # <-- CHANGED
         "prompt": full_prompt,
         "stream": False
     })
 
     if response.status_code == 200:
         ai_response = response.json().get('response', '')
+        # CLEAN the response (remove thinking tags)
+        ai_response = clean_deepseek_response(ai_response)
         return jsonify({"reply": ai_response})
     else:
         return jsonify({"reply": "Sorry, something went wrong."}), 500
@@ -140,27 +210,26 @@ def generate_quiz():
     data = request.get_json()
     topic = data.get('topic', '')
     count = data.get('count', 5)
-    selected_doc = data.get('document', None)
+    selected_docs = data.get('documents', [])
 
-    context = ""
-    if selected_doc and selected_doc in document_store:
-        context = f"Base the questions on this document content:\n\n{document_store[selected_doc]}\n\n"
-
+    context = get_context(selected_docs)
     questions = []
     asked_already = []
 
     for i in range(count):
         exclude_text = ""
         if asked_already:
-            exclude_text = f"\nDo not repeat these already-asked questions: {'; '.join(asked_already)}"
+            exclude_text = f"\nDo not repeat these questions: {'; '.join(asked_already)}"
 
         prompt = f"""{context}Generate ONE quiz question about: {topic}{exclude_text}
 
-Respond with ONLY this JSON object, nothing else:
-{{"question": "the question text here"}}"""
+Respond with ONLY this JSON object:
+{{"question": "the question text here"}}
+
+IMPORTANT: Do not include any reasoning or explanation. Only output the JSON."""
 
         response = requests.post(OLLAMA_URL, json={
-            "model": "llama3.2",
+            "model": DEEPSEEK_MODEL,  # <-- CHANGED
             "prompt": prompt,
             "stream": False,
             "format": "json"
@@ -168,6 +237,8 @@ Respond with ONLY this JSON object, nothing else:
 
         if response.status_code == 200:
             text = response.json().get('response', '').strip()
+            # CLEAN the response (remove thinking tags)
+            text = clean_deepseek_response(text)
             try:
                 result = json.loads(text)
                 if 'question' in result:
@@ -192,10 +263,12 @@ def check_answer():
 Student's answer: {answer}
 
 Evaluate if this answer is correct or mostly correct. Respond with ONLY this JSON format:
-{{"correct": true or false, "explanation": "brief explanation of the correct answer, 1-2 sentences"}}"""
+{{"correct": true or false, "explanation": "brief explanation of the correct answer, 1-2 sentences"}}
+
+IMPORTANT: Do not include any reasoning or explanation. Only output the JSON."""
 
     response = requests.post(OLLAMA_URL, json={
-        "model": "llama3.2",
+        "model": DEEPSEEK_MODEL,  # <-- CHANGED
         "prompt": prompt,
         "stream": False,
         "format": "json"
@@ -203,6 +276,8 @@ Evaluate if this answer is correct or mostly correct. Respond with ONLY this JSO
 
     if response.status_code == 200:
         text = response.json().get('response', '').strip()
+        # CLEAN the response (remove thinking tags)
+        text = clean_deepseek_response(text)
         try:
             result = json.loads(text)
             return jsonify(result)
@@ -252,27 +327,26 @@ def generate_flashcard():
     data = request.get_json()
     topic = data.get('topic', '')
     count = int(data.get('count', 1))
-    selected_doc = data.get('document', None)
+    selected_docs = data.get('documents', [])
 
-    context = ""
-    if selected_doc and selected_doc in document_store:
-        context = f"Based on this content:\n{document_store[selected_doc]}\n\n"
-
+    context = get_context(selected_docs)
     flashcards = []
     generated_fronts = []
 
     for i in range(count):
         exclude_text = ""
         if generated_fronts:
-            exclude_text = f"\nDo not repeat these already-generated terms: {'; '.join(generated_fronts)}"
+            exclude_text = f"\nDo not repeat these terms: {'; '.join(generated_fronts)}"
 
         prompt = f"""{context}Create ONE flashcard about: {topic}{exclude_text}
 
 Respond with ONLY this JSON format:
-{{"front": "question or term here", "back": "answer or definition here"}}"""
+{{"front": "question or term here", "back": "answer or definition here"}}
+
+IMPORTANT: Do not include any reasoning or explanation. Only output the JSON."""
 
         response = requests.post(OLLAMA_URL, json={
-            "model": "llama3.2",
+            "model": DEEPSEEK_MODEL,  # <-- CHANGED
             "prompt": prompt,
             "stream": False,
             "format": "json"
@@ -280,6 +354,8 @@ Respond with ONLY this JSON format:
 
         if response.status_code == 200:
             text = response.json().get('response', '').strip()
+            # CLEAN the response (remove thinking tags)
+            text = clean_deepseek_response(text)
             try:
                 result = json.loads(text)
                 if 'front' in result and 'back' in result:
@@ -326,39 +402,6 @@ def delete_note(id):
     db.close()
     return jsonify({"message": "Note deleted"})
 
-@app.route('/api/greeting', methods=['POST'])
-def get_greeting():
-    data = request.get_json()
-    name = data.get('name', 'there')
-    
-    prompt = f"""Generate a short, friendly greeting for a student named {name} who is about to study.
-    
-Respond with ONLY this JSON format:
-{{"line1": "Hello, {name}!", "line2": "short motivational subtitle here"}}
-
-The line2 should be encouraging and study-related, max 6 words."""
-
-    response = requests.post(OLLAMA_URL, json={
-        "model": "llama3.2",
-        "prompt": prompt,
-        "stream": False,
-        "format": "json"
-    })
-
-    if response.status_code == 200:
-        text = response.json().get('response', '').strip()
-        try:
-            result = json.loads(text)
-            if 'line1' in result and 'line2' in result:
-                return jsonify(result)
-        except json.JSONDecodeError:
-            pass
-
-    # Fallback greeting
-    return jsonify({
-        "line1": f"Hello, {name}!",
-        "line2": "How can I help you today?"
-    })
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

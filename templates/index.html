@@ -20,19 +20,15 @@
         <div class="sidebar-section">
             <p class="sidebar-label">Study Materials</p>
             <label class="upload-btn">
-                📎 Upload File
-                <input type="file" id="file-upload" accept=".pdf,.txt" hidden />
+                📎 Upload Files
+                <input type="file" id="file-upload" accept=".pdf,.txt" multiple hidden />
             </label>
             <div id="document-list" class="document-list"></div>
         </div>
     </aside>
 
     <main class="main">
-        <div id="theme-toggle" class="theme-switch" role="button" aria-label="Toggle Theme">
-            <span class="switch-icon sun">☀️</span>
-            <span class="switch-icon moon">🌙</span>
-            <div class="switch-thumb"></div>
-        </div>
+
         <!-- CHAT MODE -->
         <div class="view active" id="chat-view">
             <div class="chat-header">
